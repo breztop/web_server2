@@ -1,10 +1,55 @@
-DB_URL:
-SQL_PORT:5432
-SCHAME:test
-PORT:5678
-TRIGMODE:3
-TIMEOUT:10000
-OPTLINGER:false
-CONNPOOLNUM:12
-LOGSIZE:1024
-PATH:/resources
+# Bre WebServer 2.0 Configuration File
+# Architecture: Main Reactor + IO Context Pool
+
+# ==================== Server Settings ====================
+
+# 服务器端口
+PORT=8080
+
+# 资源目录（静态文件目录）
+RESOURCE_DIR=./fronted
+
+# ==================== Performance Settings ====================
+
+# IO Context Pool 大小（0表示使用CPU核心数）
+# 建议: CPU核心数，或核心数的2倍
+IO_POOL_SIZE=0
+
+# 线程池大小（用于CPU密集型任务）
+THREAD_POOL_SIZE=4
+
+# 连接超时时间（秒）
+TIMEOUT=30
+
+# ==================== Database Settings ====================
+
+# PostgreSQL数据库配置
+# 注意: 密码应该从环境变量 DB_PASSWORD 读取，不要写在配置文件中！
+# Linux:   export DB_PASSWORD=your_password
+# Windows: set DB_PASSWORD=your_password
+
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=
+DB_USER=
+
+# 数据库连接池大小
+DB_POOL_SIZE=8
+
+# ==================== Security Settings ====================
+
+# 敏感信息请使用环境变量:
+# DB_PASSWORD - 数据库密码
+# API_SECRET - API密钥（如果需要）
+
+# ==================== Advanced Settings ====================
+
+# 最大请求体大小（字节）
+MAX_BODY_SIZE=1048576
+
+# 是否启用Keep-Alive
+KEEP_ALIVE=true
+
+# 日志级别 (DEBUG, INFO, WARN, ERROR)
+LOG_LEVEL=INFO
+
