@@ -1,40 +1,45 @@
-#include "server/WebServer.hpp"
 #include <iostream>
 #include <csignal>
 #include <memory>
+#include <thread>
 
-// 全局WebServer指针用于信号处理
-std::unique_ptr<bre::WebServer> g_server;
+#include "boost/asio.hpp"
+namespace asio = boost::asio;
 
-void SignalHandler(int signal) {
-    std::cout << "\nReceived signal " << signal << ", shutting down gracefully..." << std::endl;
-    if (g_server) {
-        g_server->Stop();
-    }
-}
+#include "breutil/net/asio_io_context_pool.hpp"
+#include "server/WebServer.hpp"
+
 
 int main() {
     try {
-        // 注册信号处理器
-        std::signal(SIGINT, SignalHandler);
-        std::signal(SIGTERM, SignalHandler);
+        bre::WebServer webServer;
+
+
+        auto SignalHandler = [&webServer](int signal) {
+            std::cout << "\nReceived signal " << signal << ", shutting down gracefully..." << std::endl;
+            webServer.Stop();
+        };
         
-#ifndef _WIN32
-        // Linux下忽略SIGPIPE（防止socket写入已关闭的连接时崩溃）
-        std::signal(SIGPIPE, SIG_IGN);
-#endif
 
-        std::cout << "==================================" << std::endl;
-        std::cout << "  Bre WebServer v2.0" << std::endl;
-        std::cout << "  ASIO + PostgreSQL + C++20" << std::endl;
-        std::cout << "  Architecture: Main Reactor + IO Pool" << std::endl;
-        std::cout << "==================================" << std::endl;
-        std::cout << std::endl;
+        asio::signal_set signals(bre::AsioIOContextPool::Instance()->GetIOContext(), SIGINT, SIGTERM);
+        signals.async_wait([&SignalHandler](const boost::system::error_code& error, int signal) {
+            if (!error) {
+                SignalHandler(signal);
+            } else {
+                std::cerr << "Signal wait error: " << error.message() << std::endl;
+            }
+        });
 
-        // 创建并启动服务器
-        g_server = std::make_unique<bre::WebServer>();
-        g_server->Start();
+        
+        std::cout << "==================================\n"
+                << "  Bre WebServer v2.0\n"
+                << "==================================\n";
 
+        webServer.Start();
+
+        std::cout << "Server stopped. Goodbye!" << std::endl;
+
+        bre::AsioIOContextPool::Instance()->Stop();
     } catch (const std::exception& e) {
         std::cerr << "Fatal error: " << e.what() << std::endl;
         return 1;

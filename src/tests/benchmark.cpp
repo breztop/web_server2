@@ -1,305 +1,174 @@
+#include <benchmark/benchmark.h>
+
+#include <atomic>
 #include <iostream>
-#include <chrono>
+#include <string>
 #include <thread>
 #include <vector>
-#include <atomic>
-#include <string>
-#include <cstring>
 
+// 平台相关头文件
 #ifndef _WIN32
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
 #include <unistd.h>
+
+#include <cstring>
+#define SOCKET int
+#define INVALID_SOCKET -1
+#define closesocket close
 #else
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #pragma comment(lib, "ws2_32.lib")
+#define ssize_t int
 #endif
 
-/**
- * @brief WebServer性能基准测试
- * 
- * 测试场景:
- * 1. 单连接吞吐量
- * 2. 多连接并发
- * 3. Keep-Alive性能
- * 4. 静态文件服务性能
- */
+// 全局配置 (可以通过命令行参数传递，这里简化为常量)
+static const std::string kHost = "127.0.0.1";
+static const uint16_t kPort = 8080;
+static const std::string kRequestPath = "/index.html";
 
-class BenchmarkClient {
-public:
-    BenchmarkClient(const std::string& host, uint16_t port)
-        : _host(host), _port(port), _sockfd(-1) {
+// 辅助函数：创建 HTTP 请求字符串
+static std::string BuildRequest(bool keep_alive) {
+    std::string req = "GET " + kRequestPath + " HTTP/1.1\r\n";
+    req += "Host: " + kHost + "\r\n";
+    req += keep_alive ? "Connection: keep-alive\r\n" : "Connection: close\r\n";
+    req += "\r\n";
+    return req;
+}
+
+static const std::string kKeepAliveReq = BuildRequest(true);
+static const std::string kCloseReq = BuildRequest(false);
+
+// 简单的 Socket 包装器，用于 Benchmark 上下文
+struct ClientSocket {
+    SOCKET fd = INVALID_SOCKET;
+
+    ClientSocket() {
 #ifdef _WIN32
-        WSADATA wsaData;
-        WSAStartup(MAKEWORD(2, 2), &wsaData);
+        // 注意：实际生产中 WSADATA 应只初始化一次，这里为了简单放在构造中，
+        // 但在 benchmark 多次运行中可能重复调用，生产环境建议单例管理。
+        static bool ws_initialized = false;
+        if (!ws_initialized) {
+            WSADATA wsaData;
+            WSAStartup(MAKEWORD(2, 2), &wsaData);
+            ws_initialized = true;
+        }
 #endif
     }
 
-    ~BenchmarkClient() {
-        Close();
-#ifdef _WIN32
-        WSACleanup();
-#endif
-    }
+    ~ClientSocket() { Close(); }
 
     bool Connect() {
-        _sockfd = socket(AF_INET, SOCK_STREAM, 0);
-        if (_sockfd < 0) {
-            return false;
-        }
+        fd = socket(AF_INET, SOCK_STREAM, 0);
+        if (fd == INVALID_SOCKET) return false;
 
-        struct sockaddr_in serv_addr;
-        std::memset(&serv_addr, 0, sizeof(serv_addr));
+        struct sockaddr_in serv_addr{};
         serv_addr.sin_family = AF_INET;
-        serv_addr.sin_port = htons(_port);
-        
-        if (inet_pton(AF_INET, _host.c_str(), &serv_addr.sin_addr) <= 0) {
+        serv_addr.sin_port = htons(kPort);
+
+        if (inet_pton(AF_INET, kHost.c_str(), &serv_addr.sin_addr) <= 0) {
             Close();
             return false;
         }
 
-        if (connect(_sockfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) {
+        if (connect(fd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) {
             Close();
             return false;
         }
-
         return true;
     }
 
-    bool SendRequest(const std::string& path, bool keepAlive = false) {
-        std::string request = "GET " + path + " HTTP/1.1\r\n";
-        request += "Host: " + _host + "\r\n";
-        if (keepAlive) {
-            request += "Connection: keep-alive\r\n";
-        } else {
-            request += "Connection: close\r\n";
-        }
-        request += "\r\n";
+    bool SendAndRecv(const std::string& request) {
+        if (fd == INVALID_SOCKET) return false;
 
-        ssize_t sent = send(_sockfd, request.c_str(), request.size(), 0);
-        return sent == static_cast<ssize_t>(request.size());
-    }
+        ssize_t sent = send(fd, request.c_str(), request.size(), 0);
+        if (sent != static_cast<ssize_t>(request.size())) return false;
 
-    bool ReceiveResponse() {
         char buffer[4096];
-        ssize_t received = recv(_sockfd, buffer, sizeof(buffer) - 1, 0);
+        ssize_t received = recv(fd, buffer, sizeof(buffer) - 1, 0);
         return received > 0;
     }
 
     void Close() {
-        if (_sockfd >= 0) {
-#ifdef _WIN32
-            closesocket(_sockfd);
-#else
-            close(_sockfd);
-#endif
-            _sockfd = -1;
+        if (fd != INVALID_SOCKET) {
+            closesocket(fd);
+            fd = INVALID_SOCKET;
         }
     }
-
-private:
-    std::string _host;
-    uint16_t _port;
-    int _sockfd;
 };
 
-class Benchmark {
-public:
-    struct Result {
-        size_t totalRequests = 0;
-        size_t successRequests = 0;
-        size_t failedRequests = 0;
-        double elapsedSeconds = 0.0;
-        double qps = 0.0;
-        double avgLatencyMs = 0.0;
-    };
-
-    static Result RunSimpleTest(const std::string& host, uint16_t port, 
-                                 size_t numRequests) {
-        std::cout << "\n=== Simple Test ===" << std::endl;
-        std::cout << "Sending " << numRequests << " requests..." << std::endl;
-
-        Result result;
-        result.totalRequests = numRequests;
-
-        auto start = std::chrono::high_resolution_clock::now();
-
-        for (size_t i = 0; i < numRequests; ++i) {
-            BenchmarkClient client(host, port);
-            if (client.Connect()) {
-                if (client.SendRequest("/index.html") && client.ReceiveResponse()) {
-                    ++result.successRequests;
-                } else {
-                    ++result.failedRequests;
-                }
-                client.Close();
-            } else {
-                ++result.failedRequests;
+// -----------------------------------------------------------------------------
+// Benchmark 1: 单连接顺序请求 (模拟原 RunSimpleTest，但测量单次请求耗时)
+// 注意：这里每次迭代都新建连接，开销较大，主要测试连接建立 + 简单请求的总耗时
+// -----------------------------------------------------------------------------
+static void BM_SingleRequest_NewConnection(benchmark::State& state) {
+    for (auto _ : state) {
+        ClientSocket client;
+        if (client.Connect()) {
+            if (!client.SendAndRecv(kCloseReq)) {
+                state.SkipWithError("Failed to send/recv");
             }
+        } else {
+            state.SkipWithError("Failed to connect");
         }
-
-        auto end = std::chrono::high_resolution_clock::now();
-        result.elapsedSeconds = std::chrono::duration<double>(end - start).count();
-        result.qps = result.successRequests / result.elapsedSeconds;
-        result.avgLatencyMs = (result.elapsedSeconds * 1000.0) / numRequests;
-
-        return result;
     }
-
-    static Result RunConcurrentTest(const std::string& host, uint16_t port,
-                                    size_t numThreads, size_t requestsPerThread) {
-        std::cout << "\n=== Concurrent Test ===" << std::endl;
-        std::cout << "Threads: " << numThreads << std::endl;
-        std::cout << "Requests per thread: " << requestsPerThread << std::endl;
-
-        Result result;
-        result.totalRequests = numThreads * requestsPerThread;
-
-        std::atomic<size_t> successCount{0};
-        std::atomic<size_t> failCount{0};
-
-        auto start = std::chrono::high_resolution_clock::now();
-
-        std::vector<std::thread> threads;
-        for (size_t t = 0; t < numThreads; ++t) {
-            threads.emplace_back([&, host, port, requestsPerThread]() {
-                for (size_t i = 0; i < requestsPerThread; ++i) {
-                    BenchmarkClient client(host, port);
-                    if (client.Connect()) {
-                        if (client.SendRequest("/index.html") && client.ReceiveResponse()) {
-                            ++successCount;
-                        } else {
-                            ++failCount;
-                        }
-                        client.Close();
-                    } else {
-                        ++failCount;
-                    }
-                }
-            });
-        }
-
-        for (auto& thread : threads) {
-            thread.join();
-        }
-
-        auto end = std::chrono::high_resolution_clock::now();
-
-        result.successRequests = successCount.load();
-        result.failedRequests = failCount.load();
-        result.elapsedSeconds = std::chrono::duration<double>(end - start).count();
-        result.qps = result.successRequests / result.elapsedSeconds;
-        result.avgLatencyMs = (result.elapsedSeconds * 1000.0) / result.totalRequests;
-
-        return result;
-    }
-
-    static Result RunKeepAliveTest(const std::string& host, uint16_t port,
-                                   size_t numConnections, size_t requestsPerConnection) {
-        std::cout << "\n=== Keep-Alive Test ===" << std::endl;
-        std::cout << "Connections: " << numConnections << std::endl;
-        std::cout << "Requests per connection: " << requestsPerConnection << std::endl;
-
-        Result result;
-        result.totalRequests = numConnections * requestsPerConnection;
-
-        std::atomic<size_t> successCount{0};
-        std::atomic<size_t> failCount{0};
-
-        auto start = std::chrono::high_resolution_clock::now();
-
-        std::vector<std::thread> threads;
-        for (size_t c = 0; c < numConnections; ++c) {
-            threads.emplace_back([&, host, port, requestsPerConnection]() {
-                BenchmarkClient client(host, port);
-                if (client.Connect()) {
-                    for (size_t i = 0; i < requestsPerConnection; ++i) {
-                        bool isLast = (i == requestsPerConnection - 1);
-                        if (client.SendRequest("/index.html", !isLast) && 
-                            client.ReceiveResponse()) {
-                            ++successCount;
-                        } else {
-                            ++failCount;
-                            break;
-                        }
-                    }
-                    client.Close();
-                } else {
-                    failCount += requestsPerConnection;
-                }
-            });
-        }
-
-        for (auto& thread : threads) {
-            thread.join();
-        }
-
-        auto end = std::chrono::high_resolution_clock::now();
-
-        result.successRequests = successCount.load();
-        result.failedRequests = failCount.load();
-        result.elapsedSeconds = std::chrono::duration<double>(end - start).count();
-        result.qps = result.successRequests / result.elapsedSeconds;
-        result.avgLatencyMs = (result.elapsedSeconds * 1000.0) / result.totalRequests;
-
-        return result;
-    }
-
-    static void PrintResult(const std::string& testName, const Result& result) {
-        std::cout << "\n--- " << testName << " Results ---" << std::endl;
-        std::cout << "Total Requests:   " << result.totalRequests << std::endl;
-        std::cout << "Successful:       " << result.successRequests << std::endl;
-        std::cout << "Failed:           " << result.failedRequests << std::endl;
-        std::cout << "Elapsed Time:     " << result.elapsedSeconds << " seconds" << std::endl;
-        std::cout << "QPS:              " << result.qps << " req/s" << std::endl;
-        std::cout << "Avg Latency:      " << result.avgLatencyMs << " ms" << std::endl;
-        std::cout << "Success Rate:     " 
-                 << (result.successRequests * 100.0 / result.totalRequests) << "%" << std::endl;
-    }
-};
-
-int main(int argc, char* argv[]) {
-    std::string host = "127.0.0.1";
-    uint16_t port = 8080;
-
-    if (argc > 1) {
-        host = argv[1];
-    }
-    if (argc > 2) {
-        port = static_cast<uint16_t>(std::stoi(argv[2]));
-    }
-
-    std::cout << "============================================" << std::endl;
-    std::cout << "  WebServer Benchmark Test" << std::endl;
-    std::cout << "  Target: " << host << ":" << port << std::endl;
-    std::cout << "============================================" << std::endl;
-
-    // 等待用户确认服务器已启动
-    std::cout << "\nMake sure the server is running on " << host << ":" << port << std::endl;
-    std::cout << "Press Enter to start benchmark..." << std::endl;
-    std::cin.get();
-
-    // 测试1: 简单顺序请求
-    auto result1 = Benchmark::RunSimpleTest(host, port, 100);
-    Benchmark::PrintResult("Simple Test", result1);
-
-    std::this_thread::sleep_for(std::chrono::seconds(2));
-
-    // 测试2: 并发请求
-    auto result2 = Benchmark::RunConcurrentTest(host, port, 10, 100);
-    Benchmark::PrintResult("Concurrent Test", result2);
-
-    std::this_thread::sleep_for(std::chrono::seconds(2));
-
-    // 测试3: Keep-Alive测试
-    auto result3 = Benchmark::RunKeepAliveTest(host, port, 10, 100);
-    Benchmark::PrintResult("Keep-Alive Test", result3);
-
-    std::cout << "\n============================================" << std::endl;
-    std::cout << "  Benchmark Complete!" << std::endl;
-    std::cout << "============================================" << std::endl;
-
-    return 0;
 }
+BENCHMARK(BM_SingleRequest_NewConnection)->Unit(benchmark::kMillisecond);
+
+// -----------------------------------------------------------------------------
+// Benchmark 2: Keep-Alive 吞吐量 (模拟原 RunKeepAliveTest)
+// 在 Setup/Teardown 中维护长连接，循环内只进行请求/响应，排除握手开销
+// -----------------------------------------------------------------------------
+static void BM_KeepAlive_Throughput(benchmark::State& state) {
+    ClientSocket client;
+    // 预热：建立连接
+    if (!client.Connect()) {
+        state.SkipWithError("Failed to connect initial");
+        return;
+    }
+
+    for (auto _ : state) {
+        if (!client.SendAndRecv(kKeepAliveReq)) {
+            state.SkipWithError("Failed to send/recv in loop");
+            break;
+        }
+    }
+
+    // 清理
+    client.Close();
+}
+BENCHMARK(BM_KeepAlive_Throughput)->Unit(benchmark::kMicrosecond);
+
+// -----------------------------------------------------------------------------
+// Benchmark 3: 并发压力测试 (模拟原 RunConcurrentTest)
+// Google Benchmark 默认单线程运行一个用例。要测试并发，需使用 MultiThreaded 模式
+// 或者使用 --benchmark_min_threads / --benchmark_max_threads 命令行参数
+// 这里演示如何在代码中固定线程数 (例如 10 个并发线程)
+// -----------------------------------------------------------------------------
+static void BM_Concurrent_Requests(benchmark::State& state) {
+    // 每个线程拥有自己的连接
+    ClientSocket client;
+    if (!client.Connect()) {
+        state.SkipWithError("Failed to connect");
+        return;
+    }
+
+    for (auto _ : state) {
+        // 在并发模式下，state.iterations() 会被分摊到各个线程
+        if (!client.SendAndRecv(kKeepAliveReq)) {
+            state.SkipWithError("Request failed");
+            break;
+        }
+    }
+
+    client.Close();
+}
+// 设置并发线程数为 10 (对应原代码的 10 threads)
+BENCHMARK(BM_Concurrent_Requests)->Threads(10)->Unit(benchmark::kMicrosecond);
+
+// -----------------------------------------------------------------------------
+// Main
+// -----------------------------------------------------------------------------
+BENCHMARK_MAIN();

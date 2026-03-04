@@ -7,8 +7,8 @@ namespace bre {
 HttpConnection::HttpConnection(boost::asio::ip::tcp::socket socket, 
                                const std::string& resourceDir)
     : _socket(std::move(socket)),
-      _resourceDir(resourceDir),
-      _readBuffer(4096) {}
+      _resourceDir(resourceDir)
+    {}
 
 void HttpConnection::Start() {
     _doRead();

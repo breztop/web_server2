@@ -1,0 +1,12 @@
+function(link_libpqxx target)
+    find_package(PostgreSQL REQUIRED)
+    find_library(PQXX_LIB pqxx)
+    find_path(PQXX_INCLUDE_DIR pqxx/pqxx)
+
+    if(PQXX_LIB AND PQXX_INCLUDE_DIR)
+        target_link_libraries(${target} PRIVATE ${PQXX_LIB})
+        target_include_directories(${target} PRIVATE ${PQXX_INCLUDE_DIR})
+    else()
+        message(FATAL_ERROR "libpqxx not found!")
+    endif()
+endfunction()

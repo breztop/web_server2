@@ -1,13 +1,13 @@
-#ifndef BRE_SESSION_HPP
-#define BRE_SESSION_HPP
+#pragma once
 
 #include <boost/asio.hpp>
+#include <chrono>
 #include <memory>
 #include <string>
-#include <chrono>
-#include "../buffer/Buffer.hpp"
+
 #include "../http/HttpRequest.hpp"
 #include "../http/HttpResponse.hpp"
+#include "breutil/buffer.hpp"
 
 namespace bre {
 
@@ -22,8 +22,7 @@ public:
      * @param socket TCP socket
      * @param resourceDir 静态资源目录
      */
-    Session(boost::asio::ip::tcp::socket socket, 
-            const std::string& resourceDir);
+    Session(boost::asio::ip::tcp::socket socket, const std::string& resourceDir);
 
     /**
      * @brief 析构函数
@@ -88,38 +87,36 @@ private:
 
     // TCP socket
     boost::asio::ip::tcp::socket _socket;
-    
+
     // 超时定时器
     boost::asio::steady_timer _timer;
-    
+
     // 读缓冲区
     Buffer _readBuffer;
-    
+
     // 写缓冲区
     Buffer _writeBuffer;
-    
+
     // HTTP请求
     HttpRequest _request;
-    
+
     // 静态资源目录
     std::string _resourceDir;
-    
+
     // Session ID
     uint64_t _sessionId;
-    
+
     // 超时时间
     std::chrono::seconds _timeoutDuration;
-    
+
     // Keep-Alive标志
     bool _keepAlive;
-    
+
     // 是否已关闭
     bool _closed;
-    
+
     // 全局Session计数器
     static std::atomic<uint64_t> _sessionCounter;
 };
 
-} // namespace bre
-
-#endif // BRE_SESSION_HPP
+}  // namespace bre

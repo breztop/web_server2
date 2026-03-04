@@ -5,7 +5,7 @@
 #include <filesystem>
 #include <fstream>
 #include <sstream>
-#include "../buffer/Buffer.hpp"
+#include "breutil/buffer.hpp"
 
 namespace bre {
 

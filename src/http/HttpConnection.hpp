@@ -6,7 +6,7 @@
 #include <filesystem>
 #include "HttpRequest.hpp"
 #include "HttpResponse.hpp"
-#include "../buffer/Buffer.hpp"
+#include "breutil/buffer.hpp"
 
 namespace bre {
 

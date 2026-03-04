@@ -1,0 +1,1 @@
+set(BREUTILS_DIR_PATH "/home/brez/code/cpp/breutil" CACHE PATH "breutils库的路径，必须包含breUtils目录")

@@ -4,7 +4,7 @@
 #include <string>
 #include <unordered_map>
 #include <string_view>
-#include "../buffer/Buffer.hpp"
+#include "breutil/buffer.hpp"
 
 namespace bre {
 

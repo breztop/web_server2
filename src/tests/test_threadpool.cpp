@@ -1,6 +1,6 @@
 #define BOOST_TEST_MODULE ThreadPoolTest
 #include <boost/test/included/unit_test.hpp>
-#include "../pool/ThreadPool.hpp"
+#include "breutil/thread_pool.hpp"
 #include <atomic>
 #include <thread>
 #include <chrono>
@@ -13,7 +13,7 @@ BOOST_AUTO_TEST_CASE(test_basic_submit) {
     std::atomic<int> counter{0};
     
     for (int i = 0; i < 100; ++i) {
-        pool.Submit([&counter]() {
+        pool.Enqueue([&counter]() {
             ++counter;
         });
     }
@@ -25,7 +25,7 @@ BOOST_AUTO_TEST_CASE(test_basic_submit) {
 BOOST_AUTO_TEST_CASE(test_future_result) {
     bre::ThreadPool pool(2);
     
-    auto future = pool.Submit([]() { return 42; });
+    auto future = pool.Enqueue([]() { return 42; });
     BOOST_CHECK_EQUAL(future.get(), 42);
 }
 
@@ -34,7 +34,7 @@ BOOST_AUTO_TEST_CASE(test_multiple_futures) {
     
     std::vector<std::future<int>> futures;
     for (int i = 0; i < 10; ++i) {
-        futures.push_back(pool.Submit([i]() { return i * i; }));
+        futures.push_back(pool.Enqueue([i]() { return i * i; }));
     }
     
     for (int i = 0; i < 10; ++i) {
@@ -45,7 +45,7 @@ BOOST_AUTO_TEST_CASE(test_multiple_futures) {
 BOOST_AUTO_TEST_CASE(test_exception_handling) {
     bre::ThreadPool pool(2);
     
-    auto future = pool.Submit([]() -> int {
+    auto future = pool.Enqueue([]() -> int {
         throw std::runtime_error("test exception");
     });
     
@@ -63,7 +63,7 @@ BOOST_AUTO_TEST_CASE(test_wait_all) {
     std::atomic<int> counter{0};
     
     for (int i = 0; i < 100; ++i) {
-        pool.Submit([&counter]() {
+        pool.Enqueue([&counter]() {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
             ++counter;
         });
@@ -83,7 +83,7 @@ BOOST_AUTO_TEST_CASE(test_concurrent_submit) {
     for (int t = 0; t < 10; ++t) {
         threads.emplace_back([&]() {
             for (int i = 0; i < 100; ++i) {
-                pool.Submit([&counter]() {
+                pool.Enqueue([&counter]() {
                     ++counter;
                 });
             }
@@ -104,7 +104,7 @@ BOOST_AUTO_TEST_CASE(test_queue_size) {
     std::atomic<bool> hold{true};
     
     // 提交一个长时间运行的任务
-    pool.Submit([&hold]() {
+    pool.Enqueue([&hold]() {
         while (hold.load()) {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
@@ -115,7 +115,7 @@ BOOST_AUTO_TEST_CASE(test_queue_size) {
     
     // 提交更多任务到队列
     for (int i = 0; i < 10; ++i) {
-        pool.Submit([]() {});
+        pool.Enqueue([]() {});
     }
     
     BOOST_CHECK(pool.GetQueueSize() > 0);
