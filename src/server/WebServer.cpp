@@ -2,12 +2,13 @@
 
 #include <csignal>
 #include <iostream>
+#include <thread>
 
 #include "breutil/ini/ini.hpp"
 
 namespace bre {
 
-const std::string DEFAULT_CONFIG_FILE = "config.txt";
+const std::string DEFAULT_CONFIG_FILE = "config.ini";
 
 WebServer::WebServer()
     : _dbPool(PostgrePool::Instance())
@@ -51,11 +52,11 @@ void WebServer::LoadConfig() {
 void WebServer::InitDatabase() {
     auto& db_config = bre::Ini::Instance(DEFAULT_CONFIG_FILE)["database"];
 
-    std::string dbHost = db_config.GetStr("DB_HOST", "localhost");
-    std::string dbPort = db_config.GetStr("DB_PORT", "5432");
-    std::string dbName = db_config.GetStr("DB_NAME", "");
-    std::string dbUser = db_config.GetStr("DB_USER", "");
-    std::string dbPassword = db_config.GetStr("DB_PASSWORD", "");
+    std::string dbHost = db_config.GetStr("db_host", "localhost");
+    std::string dbPort = db_config.GetStr("db_port", "5432");
+    std::string dbName = db_config.GetStr("db_name", "");
+    std::string dbUser = db_config.GetStr("db_user", "");
+    std::string dbPassword = db_config.GetStr("db_password", "");
 
     if (!dbName.empty() && !dbUser.empty()) {
         // 构建连接字符串
@@ -66,10 +67,12 @@ void WebServer::InitDatabase() {
             connInfo += " password=" + dbPassword;
         }
 
-        size_t dbPoolSize = static_cast<size_t>(db_config.GetInt("DB_POOL_SIZE", 8));
+        size_t dbPoolSize = static_cast<size_t>(db_config.GetInt("db_pool_size", 8));
 
         try {
-            _dbPool.Init(connInfo, dbPoolSize);
+            _dbPool->Init(connInfo, dbPoolSize);
+
+
             std::cout << "Database pool initialized (size: " << dbPoolSize << ")" << std::endl;
         } catch (const std::exception& e) {
             std::cerr << "Failed to initialize database pool: " << e.what() << std::endl;
@@ -91,8 +94,6 @@ void WebServer::InitServer() {
     _acceptor->set_option(boost::asio::ip::tcp::acceptor::reuse_address(true));
     _acceptor->bind(endpoint);
     _acceptor->listen();
-
-    std::cout << "Server initialized on port " << _port << std::endl;
 }
 
 void WebServer::Start() {
@@ -100,10 +101,6 @@ void WebServer::Start() {
         std::cout << "Server is already running" << std::endl;
         return;
     }
-
-    std::cout << "\n========================================" << std::endl;
-    std::cout << "  Bre WebServer 2.0 Starting..." << std::endl;
-    std::cout << "========================================" << std::endl;
 
     // 开始接受连接
     StartAccept();
@@ -137,7 +134,9 @@ void WebServer::Stop() {
     _threadPool.reset();
 
     // 关闭数据库连接池
-    _dbPool.Close();
+    if (_dbPool) {
+        _dbPool->Close();
+    }
 
     std::cout << "Server stopped." << std::endl;
 }

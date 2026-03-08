@@ -6,6 +6,7 @@ build*/
 run*/
 .vscode/
 WebServer/
+config.ini
 
 # User-specific files
 *.rsuser

@@ -20,6 +20,7 @@ set(EXECUTABLE_OUTPUT_PATH ${CMAKE_SOURCE_DIR}/run)
 
 include(cmake/platform.cmake)
 include(cmake/compile_option.cmake)
+include(cmake/generate_build_info.cmake)
 
 include(cmake/link_boost.cmake)
 include(cmake/link_libpqcxx.cmake)
@@ -30,6 +31,7 @@ find_package(Threads REQUIRED)
 
 # 添加子目录
 add_subdirectory(src)
+
 
 
 

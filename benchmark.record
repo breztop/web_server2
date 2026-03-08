@@ -1,0 +1,6 @@
+----------------------------------------------------------------------------
+Benchmark                                  Time             CPU   Iterations
+----------------------------------------------------------------------------
+BM_SingleRequest_NewConnection         0.235 ms        0.048 ms        15221
+BM_KeepAlive_Throughput                 29.1 us         3.09 us       100000
+BM_Concurrent_Requests/threads:10       24.3 us         3.66 us       187600

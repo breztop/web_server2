@@ -32,12 +32,10 @@
 ```
 web_server2/
 ├── CMakeLists.txt          # 根CMake配置
-├── config.txt              # 服务器配置文件
+├── config.ini              # 服务器配置文件
+├── config.ini.example      # 配置模板
 ├── README.md               # 项目说明
-├── ARCHITECTURE.md         # 架构文档（详细设计）
 ├── QUICKSTART.md           # 快速开始指南
-├── build.sh                # Linux编译脚本
-├── build.ps1               # Windows编译脚本
 ├── fronted/                # 前端静态资源
 │   ├── index.html
 │   ├── images/
@@ -45,32 +43,24 @@ web_server2/
 ├── src/                    # 源代码目录
 │   ├── CMakeLists.txt
 │   ├── main.cpp            # 程序入口
-│   ├── buffer/             # 缓冲区模块（Header-only）
-│   │   └── Buffer.hpp
-│   ├── config/             # 配置管理模块
-│   │   ├── Config.hpp
-│   │   └── Config.cpp      # ✨ 新增实现文件
 │   ├── database/           # 数据库模块
-│   │   └── PostgreSQLPool.hpp
+│   │   ├── postgre_pool.hpp
+│   │   └── postgre_pool.cpp
 │   ├── http/               # HTTP处理模块
+│   │   ├── HttpConnection.hpp
+│   │   ├── HttpConnection.cpp
 │   │   ├── HttpRequest.hpp
+│   │   ├── HttpRequest.cpp
 │   │   ├── HttpResponse.hpp
-│   │   └── HttpConnection.hpp
-│   ├── pool/               # 线程池模块（Header-only）
-│   │   └── ThreadPool.hpp
-│   ├── server/             # 服务器核心 ✨ 新架构
-│   │   ├── IoContextPool.hpp   # IO上下文池
-│   │   ├── IoContextPool.cpp   # ✨ 实现文件
-│   │   ├── Session.hpp         # 会话管理
-│   │   ├── Session.cpp         # ✨ 实现文件
-│   │   ├── WebServer.hpp       # 主服务器
-│   │   └── WebServer.cpp       # ✨ 实现文件
-│   ├── timer/              # 定时器模块
-│   │   └── Timer.hpp
+│   │   └── HttpResponse.cpp
+│   ├── server/             # 服务器核心
+│   │   ├── Session.hpp
+│   │   ├── Session.cpp
+│   │   ├── WebServer.hpp
+│   │   └── WebServer.cpp
 │   └── tests/              # 测试目录
 │       ├── benchmark.cpp       # ✨ 性能基准测试
 │       ├── test_buffer.cpp
-│       ├── test_config.cpp
 │       ├── test_http.cpp       # ✨ HTTP测试
 │       └── test_threadpool.cpp # ✨ 线程池测试
 └── build/                  # 编译输出目录
@@ -191,6 +181,22 @@ sudo yum install -y \
     postgresql-devel
 ```
 
+### breutil
+直接 git clone C++便携开发工具库（仅头文件）
+
+1. 不想安装的话:
+```bash
+git clone https://github.com/breztop/breutil.git
+```
+填写 cmake/ 下platform.cmake 中的路径
+
+2. 直接安装
+```bash
+git clone https://github.com/breztop/breutil.git
+cmake -S breutil -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release --target install
+```
+
 ## 🔨 编译
 
 ### Windows (使用CMake + Visual Studio)
@@ -207,7 +213,7 @@ cmake .. -G "Visual Studio 17 2022" -A x64
 cmake --build . --config Release
 
 # 运行
-.\run\web_server.exe
+..\run\breWebserver.exe
 ```
 
 ### Linux
@@ -223,94 +229,62 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j$(nproc)
 
 # 运行
-../run/web_server
+../run/breWebserver
 ```
 
 ## ⚙️ 配置
 
 ### 编辑配置文件
 
-编辑 `config.txt` 文件：
+编辑 `config.ini` 文件（可先复制 `config.ini.example`）：
 
 ```ini
-# 服务器端口
-PORT=8080
+[server]
+port=8080
+resource_dir=./fronted
 
-# 资源目录（静态文件目录）
-RESOURCE_DIR=./fronted
+[performance]
+io_pool_size=0
+thread_pool_size=4
+timeout=30
 
-# IO Context Pool 大小（0表示使用CPU核心数）
-IO_POOL_SIZE=0
+[database]
+db_host=localhost
+db_port=5432
+db_name=mydb
+db_user=postgres
+db_password=your_secure_password
+db_pool_size=8
 
-# 线程池大小
-THREAD_POOL_SIZE=4
+[security]
+enable_ssl=false
 
-# PostgreSQL配置
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=mydb
-DB_USER=postgres
-
-# 数据库连接池大小
-DB_POOL_SIZE=8
+[advanced]
+max_body_size=1048576
+keep_alive=true
+log_level=info
 ```
 
-### 🔐 设置环境变量（重要！）
+### 🔐 安全建议（重要！）
 
-**敏感信息（如数据库密码）应该通过环境变量设置，而不是写在配置文件中！**
+`db_password` 涉及敏感信息，建议限制配置文件权限：
 
-#### Linux/macOS
 ```bash
-# 设置数据库密码
-export DB_PASSWORD=your_secure_password
-
-# 永久设置（添加到 ~/.bashrc 或 ~/.zshrc）
-echo 'export DB_PASSWORD=your_secure_password' >> ~/.bashrc
-source ~/.bashrc
-
-# 验证
-echo $DB_PASSWORD
+chmod 600 config.ini
 ```
 
-#### Windows (PowerShell)
-```powershell
-# 设置数据库密码
-$env:DB_PASSWORD="your_secure_password"
-
-# 永久设置（系统级）
-[System.Environment]::SetEnvironmentVariable('DB_PASSWORD', 'your_secure_password', 'User')
-
-# 验证
-echo $env:DB_PASSWORD
-```
-
-#### Windows (CMD)
-```cmd
-set DB_PASSWORD=your_secure_password
-
-# 永久设置
-setx DB_PASSWORD "your_secure_password"
-```
-
-### 为什么使用环境变量？
-
-1. ✅ **安全性**: 密码不会被提交到版本控制系统
-2. ✅ **灵活性**: 不同环境（开发、测试、生产）使用不同配置
-3. ✅ **最佳实践**: 符合12-Factor App原则
-4. ✅ **审计友好**: 配置文件可以公开，敏感信息独立管理
+生产环境建议使用部署系统注入机密并在启动前生成配置，避免明文长期存放在仓库或共享目录。
 
 ## 🧪 运行测试
 
 ```bash
 # 编译测试
 cd build
-cmake --build . --target test_config
 cmake --build . --target test_buffer
 cmake --build . --target test_http
 cmake --build . --target test_threadpool
 
 # 运行单元测试
-./test_config
 ./test_buffer
 ./test_http
 ./test_threadpool
@@ -323,7 +297,7 @@ ctest --output-on-failure
 
 ```bash
 # 1. 启动服务器（终端1）
-./run/web_server
+./run/breWebserver
 
 # 2. 运行内置benchmark（终端2）
 cd build
@@ -354,7 +328,6 @@ wrk -t4 -c100 -d30s http://localhost:8080/index.html
 ### 测试覆盖
 
 - ✅ **Buffer**: 缓冲区操作、边界条件、移动语义
-- ✅ **Config**: 配置加载、环境变量、错误处理
 - ✅ **HTTP**: 请求解析、响应构建、文件服务
 - ✅ **ThreadPool**: 任务提交、Future、异常处理、并发
 - ✅ **Benchmark**: 吞吐量、延迟、并发性能
@@ -365,31 +338,17 @@ wrk -t4 -c100 -d30s http://localhost:8080/index.html
 
 ```bash
 # Linux
-./run/web_server
+./run/breWebserver
 
 # Windows
-.\run\web_server.exe
+.\run\breWebserver.exe
 
 # 看到类似输出表示启动成功：
-# ==================================
-#   Bre WebServer v2.0
-#   ASIO + PostgreSQL + C++20
-#   Architecture: Main Reactor + IO Pool
-# ==================================
-#
-# Configuration loaded:
-#   Port: 8080
-#   Resource Dir: ./fronted
-#   IO Pool Size: 8
-#   Thread Pool Size: 4
-# Server initialized on port 8080
-# IoContextPool started with 8 threads
-# 
-# ==========================================
+# ========================================
 #   Bre WebServer 2.0 Starting...
-# ==========================================
+# ========================================
 # Server started successfully!
-# Listening on port 8080
+# Listening 127.0.0.1:8080
 # Press Ctrl+C to stop...
 ```
 

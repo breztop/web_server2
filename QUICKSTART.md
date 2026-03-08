@@ -5,7 +5,7 @@
 ### Windows
 - Visual Studio 2022 或更高版本
 - CMake
-- Boost （已配置在 `G:/codeEnv/boost_1_84`）
+- Boost （安装后增加环境变量或者设置项目中的 BOOST_ROOT 路径）
 
 ### Linux
 - GCC 11+ 或 Clang 14+
@@ -19,20 +19,32 @@
 
 ### 2. 配置项目
 
-编辑 `config.txt`:
+编辑 `config.ini`（可先复制 `config.ini.example`）:
 ```ini
-PORT=8080
-RESOURCE_DIR=./fronted
-THREAD_COUNT=8
-TIMEOUT=5000
+[server]
+port=8080
+resource_dir=./fronted
+
+[performance]
+io_pool_size=0
+thread_pool_size=8
+timeout=30
+
+[database]
+db_host=localhost
+db_port=5432
+db_name=your_database
+db_user=your_username
+db_password=your_password
+db_pool_size=8
 ```
 
 ### 3. Windows 编译
 
 #### 使用 CMake GUI
 1. 打开 CMake GUI
-2. Source: `g:\0_cpp\web_server2`
-3. Build: `g:\0_cpp\web_server2\build`
+2. Source: `your_project_root`
+3. Build: `your_project_root/build`
 4. 点击 Configure → Generate
 5. 打开 `build/breWebserver.sln`
 6. 编译 Release 版本
@@ -51,7 +63,7 @@ cmake --build . --config Release
 
 # 运行
 cd ..
-.\run\web_server.exe
+.\run\breWebserver.exe
 ```
 
 ### 4. Linux 编译
@@ -69,7 +81,7 @@ make -j$(nproc)
 
 # 运行
 cd ..
-./run/web_server
+./run/breWebserver
 ```
 
 ## 🧪 运行测试
@@ -77,22 +89,25 @@ cd ..
 ### Windows
 ```powershell
 cd build
-cmake --build . --config Release --target test_config
 cmake --build . --config Release --target test_buffer
+cmake --build . --config Release --target test_http
+cmake --build . --config Release --target test_threadpool
 
 # 运行测试
-.\Release\test_config.exe
 .\Release\test_buffer.exe
+.\Release\test_http.exe
+.\Release\test_threadpool.exe
 ```
 
 ### Linux
 ```bash
 cd build
-make test_config test_buffer
+make test_buffer test_http test_threadpool
 
 # 运行测试
-./test_config
 ./test_buffer
+./test_http
+./test_threadpool
 
 # 或使用 CTest
 ctest --output-on-failure
@@ -103,7 +118,7 @@ ctest --output-on-failure
 ### 1. 启动服务器
 ```bash
 # 确保在项目根目录
-./run/web_server
+./run/breWebserver
 ```
 
 你应该看到类似输出：
@@ -149,32 +164,44 @@ sudo apt-get install libboost-all-dev
 - MSVC 2022+
 
 ### Q3: 端口被占用
-修改 `config.txt` 中的端口:
+修改 `config.ini` 中 `[server]` 的端口:
 ```ini
-PORT=9090
+[server]
+port=9090
 ```
 
 ### Q4: 找不到资源文件
-检查 `RESOURCE_DIR` 配置:
+检查 `resource_dir` 配置:
 ```ini
-RESOURCE_DIR=./fronted
+[server]
+resource_dir=./fronted
 ```
 
 确保 `fronted` 目录存在且包含 `index.html`。
 
 ### Q5: PostgreSQL连接失败
-如果不需要数据库功能，保持配置为空:
+如果不需要数据库功能，可清空数据库名和用户名:
 ```ini
-DB_CONN_INFO=
+[database]
+db_name=
+db_user=
 ```
 
 如果需要，确保PostgreSQL服务运行:
 ```bash
 # Linux
 sudo systemctl status postgresql
+```
 
-# 配置连接信息
-DB_CONN_INFO=host=localhost port=5432 dbname=mydb user=postgres password=yourpass
+配置数据库参数（`config.ini`）:
+```ini
+[database]
+db_host=localhost
+db_port=5432
+db_name=mydb
+db_user=postgres
+db_password=yourpass
+db_pool_size=8
 ```
 
 ## 🎯 开发提示
@@ -223,7 +250,8 @@ void _handleRequest() {
 
 1. **调整线程池大小**
    ```ini
-   THREAD_COUNT=16  # 根据CPU核心数调整
+    [performance]
+    thread_pool_size=16  # 根据CPU核心数调整
    ```
 
 2. **启用编译优化**
@@ -233,16 +261,17 @@ void _handleRequest() {
 
 3. **调整超时时间**
    ```ini
-   TIMEOUT=3000  # 减少空闲连接占用
+    [performance]
+    timeout=15  # 单位：秒
    ```
 
 ## 🔄 从旧版本迁移
 
 ### 配置文件迁移
 旧配置 → 新配置:
-- `PORT:5678` → `PORT=5678`
-- `PATH:/resources` → `RESOURCE_DIR=./fronted`
-- `CONNPOOLNUM:12` → `DB_POOL_SIZE=12`
+- `PORT:5678` → `[server] port=5678`
+- `PATH:/resources` → `[server] resource_dir=./fronted`
+- `CONNPOOLNUM:12` → `[database] db_pool_size=12`
 
 ### 代码迁移
 主要变化:
@@ -262,7 +291,7 @@ void _handleRequest() {
 2. ✅ 运行示例和测试
 3. 🔄 添加自定义功能
 4. 🔄 性能测试和优化
-5. 🔄 部署到生产环境
+5. 🔄 部署运行和使用
 
 ---
 

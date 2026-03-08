@@ -13,3 +13,12 @@ if(WIN32)
 elseif(UNIX)
     set(PLATFORM_LINUX ON)
 endif()
+
+# Release下 -O2 优化级别, 尽可能的提升运行速度
+if (CMAKE_BUILD_TYPE STREQUAL "Release")
+    if(MSVC)
+        add_compile_options(/O2)
+    else()
+        add_compile_options(-O3)
+    endif()
+endif()

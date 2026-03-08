@@ -21,7 +21,7 @@ link_breutil(${PROJECT_NAME})
 if(PLATFORM_LINUX)
     link_libpqxx(${PROJECT_NAME})
 endif()
-
+generate_build_info(${PROJECT_NAME})
 
 
 # --- 测试 ---------------------------------------------
@@ -63,3 +63,9 @@ target_link_libraries(benchmark PRIVATE
 link_benchmark(benchmark)
 
 file(COPY ${CMAKE_SOURCE_DIR}/fronted DESTINATION ${EXECUTABLE_OUTPUT_PATH})
+# 拷贝 配置文件到输出目录
+add_custom_command(TARGET benchmark POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_SOURCE_DIR}/config.ini
+        ${EXECUTABLE_OUTPUT_PATH}/config.ini
+)
