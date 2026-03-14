@@ -18,7 +18,10 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # 设置输出路径
 set(EXECUTABLE_OUTPUT_PATH ${CMAKE_SOURCE_DIR}/run)
 
-include(cmake/platform.cmake)
+# 存在 cmake/platform.cmake 文件才包含
+if (EXISTS "${CMAKE_SOURCE_DIR}/cmake/platform.cmake")
+    include(cmake/platform.cmake)
+endif()
 include(cmake/compile_option.cmake)
 include(cmake/generate_build_info.cmake)
 

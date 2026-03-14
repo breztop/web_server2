@@ -54,24 +54,30 @@ foreach(TEST_NAME ${UNIT_TESTS})
 endforeach()
 
 
-# --- Benchmark测试 ---------------------------------------------
-add_executable(benchmark
-    tests/benchmark.cpp
-)
+if (UNIX)
+    message(STATUS "Configuring benchmark for UNIX")
+    # --- Benchmark测试 ---------------------------------------------
+    add_executable(benchmark
+        tests/benchmark.cpp
+    )
 
-link_breutil(benchmark)
-target_include_directories(benchmark PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-)
-target_link_libraries(benchmark PRIVATE
-    Threads::Threads
-)
-link_benchmark(benchmark)
+    link_breutil(benchmark)
+    target_include_directories(benchmark PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+    target_link_libraries(benchmark PRIVATE
+        Threads::Threads
+    )
+    link_benchmark(benchmark)
+
+    # 拷贝 配置文件到输出目录
+    add_custom_command(TARGET benchmark POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${CMAKE_SOURCE_DIR}/config.ini
+            ${EXECUTABLE_OUTPUT_PATH}/config.ini
+    )
+endif()
+
+
 
 file(COPY ${CMAKE_SOURCE_DIR}/fronted DESTINATION ${EXECUTABLE_OUTPUT_PATH})
-# 拷贝 配置文件到输出目录
-add_custom_command(TARGET benchmark POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${CMAKE_SOURCE_DIR}/config.ini
-        ${EXECUTABLE_OUTPUT_PATH}/config.ini
-)
