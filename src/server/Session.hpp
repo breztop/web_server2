@@ -85,6 +85,12 @@ private:
      */
     void CancelTimer();
 
+    std::string _extractParam(const std::string& key);
+    void HandleApiLogin(HttpResponse& response);
+    void HandleApiRegister(HttpResponse& response);
+    void HandleApiGetUsers(HttpResponse& response);
+    void HandleApiGetUser(HttpResponse& response);
+
     // TCP socket
     boost::asio::ip::tcp::socket _socket;
 

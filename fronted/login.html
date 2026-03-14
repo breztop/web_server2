@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            width: 90%;
+            max-width: 400px;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+        input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        button {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        .links {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .links a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        .links a:hover {
+            text-decoration: underline;
+        }
+        .message {
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+        .user-info {
+            display: none;
+        }
+        .user-info.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>登录</h1>
+        
+        <div id="message" class="message"></div>
+        
+        <div id="loginForm">
+            <div class="form-group">
+                <label for="username">用户名</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            <div class="form-group">
+                <label for="password">密码</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button type="submit" onclick="doLogin()">登录</button>
+        </div>
+        
+        <div id="userInfo" class="user-info">
+            <p>欢迎, <span id="displayUsername"></span>!</p>
+            <p>邮箱: <span id="displayEmail"></span></p>
+            <button onclick="logout()" style="margin-top: 20px;">退出登录</button>
+        </div>
+        
+        <div class="links">
+            <a href="register.html">还没有账号？立即注册</a>
+            <br>
+            <a href="index.html">返回首页</a>
+        </div>
+    </div>
+
+    <script>
+        function showMessage(text, isError = false) {
+            const msg = document.getElementById('message');
+            msg.textContent = text;
+            msg.className = 'message ' + (isError ? 'error' : 'success');
+        }
+        
+        function doLogin() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            if (!username || !password) {
+                showMessage('请填写用户名和密码', true);
+                return;
+            }
+            
+            const formData = 'username=' + encodeURIComponent(username) + '&password=' + encodeURIComponent(password);
+            
+            fetch('/api/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showMessage('登录成功！', false);
+                    document.getElementById('loginForm').style.display = 'none';
+                    document.getElementById('userInfo').classList.add('show');
+                    document.getElementById('displayUsername').textContent = data.user.username;
+                    document.getElementById('displayEmail').textContent = data.user.email;
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                } else {
+                    showMessage(data.error || '登录失败', true);
+                }
+            })
+            .catch(error => {
+                showMessage('请求失败: ' + error, true);
+            });
+        }
+        
+        function logout() {
+            localStorage.removeItem('user');
+            document.getElementById('loginForm').style.display = 'block';
+            document.getElementById('userInfo').classList.remove('show');
+            document.getElementById('message').className = 'message';
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+        }
+        
+        // Check if already logged in
+        const user = localStorage.getItem('user');
+        if (user) {
+            const userData = JSON.parse(user);
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('userInfo').classList.add('show');
+            document.getElementById('displayUsername').textContent = userData.username;
+            document.getElementById('displayEmail').textContent = userData.email;
+        }
+    </script>
+</body>
+</html>

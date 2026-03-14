@@ -9,17 +9,21 @@ file(GLOB SOURCES
     "database/*.cpp"
     "http/*.cpp"
     "server/*.cpp"
+    "service/*.cpp"
 )
 
 target_sources(${PROJECT_NAME} PRIVATE
     ${SOURCES}
 )
+include_directories(.)
 
 # 链接库
 link_boost_header(${PROJECT_NAME})
 link_breutil(${PROJECT_NAME})
 if(PLATFORM_LINUX)
     link_libpqxx(${PROJECT_NAME})
+    find_package(OpenSSL REQUIRED)
+    target_link_libraries(${PROJECT_NAME} PRIVATE OpenSSL::SSL OpenSSL::Crypto)
 endif()
 generate_build_info(${PROJECT_NAME})
 
@@ -42,6 +46,8 @@ foreach(TEST_NAME ${UNIT_TESTS})
     link_breutil(${TEST_NAME})
     if(PLATFORM_LINUX)
         link_libpqxx(${TEST_NAME})
+        find_package(OpenSSL REQUIRED)
+        target_link_libraries(${TEST_NAME} PRIVATE OpenSSL::SSL OpenSSL::Crypto)
     endif()
     
     add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})

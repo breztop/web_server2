@@ -8,7 +8,7 @@
 - **主从Reactor模式**: 主IO Context负责Accept，IO Context Pool负责业务处理
 - **Session管理**: 每个连接独立Session，完整生命周期管理
 - **模块化设计**: 头文件+实现文件分离，高度解耦
-- **跨平台支持**: Windows和Linux双平台
+- **跨平台支持**: 跨平台
 
 ### 🚀 技术栈
 - ✅ **C++20标准**: concepts, ranges, coroutines等现代特性
@@ -16,7 +16,6 @@
 - ✅ **IO Context Pool**: 多IO上下文Round-Robin分配
 - ✅ **PostgreSQL**: 企业级数据库支持
 - ✅ **线程池**: 高效CPU密集型任务处理
-- ✅ **环境变量安全**: 敏感信息（密码）不存配置文件
 - ✅ **完整测试**: Boost.Test单元测试 + Benchmark性能测试
 - ✅ **优雅关闭**: 完善的资源清理机制
 
@@ -59,11 +58,12 @@ web_server2/
 │   │   ├── WebServer.hpp
 │   │   └── WebServer.cpp
 │   └── tests/              # 测试目录
-│       ├── benchmark.cpp       # ✨ 性能基准测试
+│       ├── benchmark.cpp       # 性能基准测试
 │       ├── test_buffer.cpp
-│       ├── test_http.cpp       # ✨ HTTP测试
-│       └── test_threadpool.cpp # ✨ 线程池测试
+│       ├── test_http.cpp       # HTTP测试
+│       └── test_threadpool.cpp # 线程池测试
 └── build/                  # 编译输出目录
+└── run/                    # 运行目录
 ```
 
 ## 🏗️ 核心架构

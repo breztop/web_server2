@@ -2,6 +2,11 @@
 
 #include <filesystem>
 #include <iostream>
+#include <sstream>
+
+#include "breutil/json.hpp"
+
+#include "service/user_service.hpp"
 
 namespace bre {
 
@@ -13,9 +18,8 @@ Session::Session(boost::asio::ip::tcp::socket socket, const std::string& resourc
     , _readBuffer(4096)
     , _resourceDir(resourceDir)
     , _sessionId(++_sessionCounter)
-    , _timeoutDuration(30)
-    ,  // 30秒超时
-    _keepAlive(false)
+    , _timeoutDuration(30) // 30秒超时
+    , _keepAlive(false)
     , _closed(false) {
     std::cout << "[Session " << _sessionId << "] Created from " << GetRemoteAddress() << std::endl;
 }
@@ -109,10 +113,138 @@ void Session::DoWrite() {
                                      _request.Reset();
                                      DoRead();
                                  } else {
-                                     // 关闭连接
-                                     Stop();
-                                 }
-                             });
+                                      // 关闭连接
+                                      Stop();
+                                  }
+                              });
+}
+
+std::string Session::_extractParam(const std::string& key) {
+    std::string body = _request.GetBody();
+    std::string searchKey = key + "=";
+    size_t pos = body.find(searchKey);
+    if (pos == std::string::npos) {
+        return "";
+    }
+    pos += searchKey.size();
+    size_t end = body.find("&", pos);
+    if (end == std::string::npos) {
+        end = body.size();
+    }
+    std::string value = body.substr(pos, end - pos);
+    std::replace(value.begin(), value.end(), '+', ' ');
+    return value;
+}
+
+void Session::HandleApiLogin(HttpResponse& response) {
+    std::string username = _extractParam("username");
+    std::string password = _extractParam("password");
+
+    if (username.empty() || password.empty()) {
+        bre::json::Value json;
+        json["success"] = false;
+        json["error"] = "Missing username or password";
+
+        response = HttpResponse::MakeJsonResponse(json.ToString());
+        response.SetStatus(HttpStatus::BAD_REQUEST);
+        return;
+    }
+
+    auto user = bre::UserService::Instance().Login(username, password);
+    if (user) {
+        bre::json::Value json;
+        json["success"] = true;
+        json["user"]["id"] = user->id;
+        json["user"]["username"] = user->username;
+        json["user"]["email"] = user->email;
+
+        response = HttpResponse::MakeJsonResponse(json.ToString());
+    } else {
+        bre::json::Value json;
+        json["success"] = false;
+        json["error"] = "Invalid username or password";
+        response = HttpResponse::MakeJsonResponse(json.ToString());
+        response.SetStatus(HttpStatus::UNAUTHORIZED);
+    }
+}
+
+void Session::HandleApiRegister(HttpResponse& response) {
+    std::string username = _extractParam("username");
+    std::string password = _extractParam("password");
+    std::string email = _extractParam("email");
+
+    if (username.empty() || password.empty()) {
+        bre::json::Value json;
+        json["success"] = false;
+        json["error"] = "Missing username or password";
+
+        response = HttpResponse::MakeJsonResponse(json.ToString());
+        response.SetStatus(HttpStatus::BAD_REQUEST);
+        return;
+    }
+
+    bool success = bre::UserService::Instance().Register(username, password, email);
+    if (success) {
+        bre::json::Value json;
+        json["success"] = true;
+        json["message"] = "User registered successfully";
+        response = HttpResponse::MakeJsonResponse(json.ToString());
+    } else {
+        bre::json::Value json;
+        json["success"] = false;
+        json["error"] = "Username already exists";
+        response = HttpResponse::MakeJsonResponse(json.ToString());
+        response.SetStatus(HttpStatus::CONFLICT);
+    }
+}
+
+void Session::HandleApiGetUsers(HttpResponse& response) {
+    auto users = bre::UserService::Instance().GetAllUsers(100, 0);
+    
+    bre::json::Value json;
+    json["success"] = true;
+    for (const auto& user : users) {
+        bre::json::Value userJson;
+        userJson["id"] = user.id;
+        userJson["username"] = user.username;
+        userJson["email"] = user.email;
+        json["users"].Append(userJson);
+    }
+
+    response = HttpResponse::MakeJsonResponse(json.ToString());
+}
+
+
+void Session::HandleApiGetUser(HttpResponse& response) {
+    std::string idStr = _extractParam("id");
+    if (idStr.empty()) {
+        bre::json::Value json;
+        json["success"] = false;
+        json["error"] = "Missing user id";
+
+        response = HttpResponse::MakeJsonResponse(json.ToString());
+        response.SetStatus(HttpStatus::BAD_REQUEST);
+        return;
+    }
+    
+    int id = std::stoi(idStr);
+    auto user = bre::UserService::Instance().GetUserById(id);
+    
+    if (user) {
+        bre::json::Value json;
+        json["success"] = true;
+        json["user"]["id"] = user->id;
+        json["user"]["username"] = user->username;
+        json["user"]["email"] = user->email;
+        json["user"]["created_at"] = user->created_at;
+        response = HttpResponse::MakeJsonResponse(json.ToString());
+    } else {
+        bre::json::Value json;
+        json["success"] = false;
+        json["error"] = "User not found";
+        response = HttpResponse::MakeJsonResponse(json.ToString());
+        response.SetStatus(HttpStatus::NOT_FOUND);
+    }
 }
 
 void Session::HandleRequest() {
@@ -131,13 +263,20 @@ void Session::HandleRequest() {
 
     // 简单的路由处理
     if (path.find("/api/") == 0) {
-        // API请求
         if (path == "/api/health") {
             response = HttpResponse::MakeJsonResponse(R"({"status":"ok","version":"2.0"})");
         } else if (path == "/api/info") {
             std::string json = R"({"server":"Bre WebServer","version":"2.0","session":")" +
                                std::to_string(_sessionId) + R"("})";
             response = HttpResponse::MakeJsonResponse(json);
+        } else if (path == "/api/login" && _request.GetMethod() == HttpMethod::POST) {
+            HandleApiLogin(response);
+        } else if (path == "/api/register" && _request.GetMethod() == HttpMethod::POST) {
+            HandleApiRegister(response);
+        } else if (path == "/api/users" && _request.GetMethod() == HttpMethod::GET) {
+            HandleApiGetUsers(response);
+        } else if (path == "/api/user" && _request.GetMethod() == HttpMethod::GET) {
+            HandleApiGetUser(response);
         } else {
             response =
                 HttpResponse::MakeErrorResponse(HttpStatus::NOT_FOUND, "API endpoint not found");
