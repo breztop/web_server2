@@ -31,7 +31,7 @@ jobs:
 
       - name: Install Boost libraries (Windows)
         if: matrix.os == 'windows-latest'
-        uses: MarkusJx/install-boost@v1.1.7
+        uses: MarkusJx/install-boost@v2.5.1
         with:
           boost_version: 1.83.0
           toolset: msvc
