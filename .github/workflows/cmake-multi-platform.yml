@@ -22,7 +22,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libboost-all-dev libpq-dev google-benchmark
+          sudo apt-get install -y libboost-all-dev libpq-dev libbenchmark-dev
 
       - name: Install Boost (macOS)
         if: matrix.os == 'macos-latest'
@@ -31,12 +31,14 @@ jobs:
 
       - name: Install Boost libraries (Windows)
         if: matrix.os == 'windows-latest'
+        id: install-boost
         uses: MarkusJx/install-boost@v2.5.1
         with:
           boost_version: 1.83.0
           toolset: msvc
           cache: true
           libs: "all"
+          link: static
 
       - name: Cache CMake build
         uses: actions/cache@v4
@@ -44,20 +46,11 @@ jobs:
           path: build
           key: ${{ runner.os }}-cmake-${{ hashFiles('**/CMakeLists.txt') }}
       
-      - name: Cache vcpkg
-        if: matrix.os == 'windows-latest'
-        uses: actions/cache@v4
-        with:
-          path: |
-            vcpkg/installed
-            vcpkg/packages
-          key: ${{ runner.os }}-vcpkg-${{ hashFiles('**/CMakeLists.txt') }}
 
       - name: Configure
-        run: |
-          cmake -B build -S . \
-          -DCMAKE_BUILD_TYPE=Release \
-          ${{ matrix.os == 'windows-latest' && '-DCMAKE_TOOLCHAIN_FILE=vcpkg/scripts/buildsystems/vcpkg.cmake' || '' }}
+        run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+        env:
+          BOOST_ROOT: ${{ steps.install-boost.outputs.BOOST_ROOT }}
 
       - name: Build
         run: cmake --build build --config Release
