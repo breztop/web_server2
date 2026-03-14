@@ -22,12 +22,13 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libboost-all-dev libpq-dev libbenchmark-dev
+          sudo apt-get install -y libboost-all-dev libpq-dev libpqxx-dev libbenchmark-dev
 
       - name: Install Boost (macOS)
         if: matrix.os == 'macos-latest'
         run: |
-          brew install boost libpq google-benchmark
+          brew install boost libpq libpqxx google-benchmark
+          brew link --force libpq
 
       - name: Install Boost libraries (Windows)
         if: matrix.os == 'windows-latest'
