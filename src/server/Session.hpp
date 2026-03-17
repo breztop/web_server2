@@ -5,8 +5,8 @@
 #include <memory>
 #include <string>
 
-#include "../http/HttpRequest.hpp"
-#include "../http/HttpResponse.hpp"
+#include "http/HttpRequest.hpp"
+#include "http/HttpResponse.hpp"
 #include "breutil/buffer.hpp"
 
 namespace bre {

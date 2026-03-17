@@ -22,36 +22,39 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libboost-all-dev libpq-dev libpqxx-dev libbenchmark-dev
+          sudo apt-get install -y libboost-all-dev
 
       - name: Install Boost (macOS)
         if: matrix.os == 'macos-latest'
         run: |
-          brew install boost libpq libpqxx google-benchmark
-          brew link --force libpq
+          brew install boost
 
-      - name: Install Boost libraries (Windows)
+      - name: Install Boost (Windows)
         if: matrix.os == 'windows-latest'
-        id: install-boost
-        uses: MarkusJx/install-boost@v2.5.1
-        with:
-          boost_version: 1.83.0
-          toolset: msvc
-          cache: true
-          libs: "all"
-          link: static
+        run: vcpkg install boost-system boost-filesystem boost-test boost-asio boost-beast --triplet x64-windows
 
-      - name: Cache CMake build
+      - name: Cache vcpkg (Windows)
+        if: matrix.os == 'windows-latest'
         uses: actions/cache@v4
         with:
-          path: build
-          key: ${{ runner.os }}-cmake-${{ hashFiles('**/CMakeLists.txt') }}
-      
+          path: |
+            ${{ env.VCPKG_INSTALLATION_ROOT }}/installed
+            ${{ env.VCPKG_INSTALLATION_ROOT }}/packages
+          key: ${{ runner.os }}-vcpkg-${{ hashFiles('**/CMakeLists.txt') }}
 
       - name: Configure
-        run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
-        env:
-          BOOST_ROOT: ${{ steps.install-boost.outputs.BOOST_ROOT }}
+        shell: bash
+        run: |
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            cmake -B build -S . \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" \
+              -DVCPKG_TARGET_TRIPLET=x64-windows \
+              -DCMAKE_WINDOWS_EXPORT_ALL_SYMBOLS=ON \
+              -DBoost_ARCHITECTURE=-x64
+          else
+            cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+          fi
 
       - name: Build
         run: cmake --build build --config Release

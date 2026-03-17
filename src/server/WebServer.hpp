@@ -5,7 +5,6 @@
 #include <memory>
 #include <string>
 
-#include "../database/postgre_pool.hpp"
 #include "Session.hpp"
 #include "breutil/net/asio_io_context_pool.hpp"
 #include "breutil/thread_pool.hpp"
@@ -82,9 +81,6 @@ private:
     // 线程池（用于CPU密集型任务）
     std::unique_ptr<ThreadPool> _threadPool;
 
-    // 数据库连接池
-    PostgrePool::Shared _dbPool;
-
     // 配置
     uint16_t _port;
     std::string _resourceDir;
@@ -98,5 +94,6 @@ private:
     std::atomic<uint64_t> _totalConnections;
     std::atomic<uint64_t> _activeConnections;
 };
+
 
 }  // namespace bre

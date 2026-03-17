@@ -6,7 +6,9 @@
 
 #include "breutil/json.hpp"
 
+#ifdef HAVE_POSTGRESQL
 #include "service/user_service.hpp"
+#endif  // HAVE_POSTGRESQL
 
 namespace bre {
 
@@ -137,6 +139,7 @@ std::string Session::_extractParam(const std::string& key) {
 }
 
 void Session::HandleApiLogin(HttpResponse& response) {
+#ifdef HAVE_POSTGRESQL
     std::string username = _extractParam("username");
     std::string password = _extractParam("password");
 
@@ -166,9 +169,17 @@ void Session::HandleApiLogin(HttpResponse& response) {
         response = HttpResponse::MakeJsonResponse(json.ToString());
         response.SetStatus(HttpStatus::UNAUTHORIZED);
     }
+#else
+    bre::json::Value json;
+    json["success"] = false;
+    json["error"] = "PostgreSQL support is not enabled";
+    response = HttpResponse::MakeJsonResponse(json.ToString());
+    response.SetStatus(HttpStatus::SERVICE_UNAVAILABLE);
+#endif
 }
 
 void Session::HandleApiRegister(HttpResponse& response) {
+#ifdef HAVE_POSTGRESQL
     std::string username = _extractParam("username");
     std::string password = _extractParam("password");
     std::string email = _extractParam("email");
@@ -196,9 +207,17 @@ void Session::HandleApiRegister(HttpResponse& response) {
         response = HttpResponse::MakeJsonResponse(json.ToString());
         response.SetStatus(HttpStatus::CONFLICT);
     }
+#else
+    bre::json::Value json;
+    json["success"] = false;
+    json["error"] = "PostgreSQL support is not enabled";
+    response = HttpResponse::MakeJsonResponse(json.ToString());
+    response.SetStatus(HttpStatus::SERVICE_UNAVAILABLE);
+#endif
 }
 
 void Session::HandleApiGetUsers(HttpResponse& response) {
+#ifdef HAVE_POSTGRESQL
     auto users = bre::UserService::Instance().GetAllUsers(100, 0);
     
     bre::json::Value json;
@@ -212,10 +231,18 @@ void Session::HandleApiGetUsers(HttpResponse& response) {
     }
 
     response = HttpResponse::MakeJsonResponse(json.ToString());
+#else
+    bre::json::Value json;
+    json["success"] = false;
+    json["error"] = "PostgreSQL support is not enabled";
+    response = HttpResponse::MakeJsonResponse(json.ToString());
+    response.SetStatus(HttpStatus::SERVICE_UNAVAILABLE);
+#endif  // HAVE_POSTGRESQL
 }
 
 
 void Session::HandleApiGetUser(HttpResponse& response) {
+#ifdef HAVE_POSTGRESQL
     std::string idStr = _extractParam("id");
     if (idStr.empty()) {
         bre::json::Value json;
@@ -245,6 +272,13 @@ void Session::HandleApiGetUser(HttpResponse& response) {
         response = HttpResponse::MakeJsonResponse(json.ToString());
         response.SetStatus(HttpStatus::NOT_FOUND);
     }
+#else
+    bre::json::Value json;
+    json["success"] = false;
+    json["error"] = "PostgreSQL support is not enabled";
+    response = HttpResponse::MakeJsonResponse(json.ToString());
+    response.SetStatus(HttpStatus::SERVICE_UNAVAILABLE);
+#endif  // HAVE_POSTGRESQL
 }
 
 void Session::HandleRequest() {

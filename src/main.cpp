@@ -13,7 +13,13 @@ namespace asio = boost::asio;
 void print_build_info() {
     std::cout << "=====================================\n"
               << bre::GenerateBuildInfo::GetBuildInfo()
-              << "=====================================\n";
+              << "\n=====================================\n";
+#ifdef HAVE_POSTGRESQL
+    std::cout << "\nPostgreSQL support: ENABLED\n";
+#else
+#warning "PostgreSQL support disabled"
+    std::cout << "\nPostgreSQL support: DISABLED\n";
+#endif
 }
 
 

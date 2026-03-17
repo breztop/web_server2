@@ -5,14 +5,14 @@
 #include <thread>
 
 #include "breutil/ini/ini.hpp"
+#include "database/postgre_pool.hpp"
 
 namespace bre {
 
 const std::string DEFAULT_CONFIG_FILE = "config.ini";
 
 WebServer::WebServer()
-    : _dbPool(PostgrePool::Instance())
-    , _port(8080)
+    : _port(8080)
     , _ioPoolSize(4)
     , _threadPoolSize(4)
     , _running(false)
@@ -50,6 +50,7 @@ void WebServer::LoadConfig() {
 }
 
 void WebServer::InitDatabase() {
+#ifdef HAVE_POSTGRESQL
     auto& db_config = bre::Ini::Instance(DEFAULT_CONFIG_FILE)["database"];
 
     std::string dbHost = db_config.GetStr("db_host", "localhost");
@@ -70,7 +71,7 @@ void WebServer::InitDatabase() {
         size_t dbPoolSize = static_cast<size_t>(db_config.GetInt("db_pool_size", 8));
 
         try {
-            _dbPool->Init(connInfo, dbPoolSize);
+            PostgrePool::Instance()->Init(connInfo, dbPoolSize);
 
 
             std::cout << "Database pool initialized (size: " << dbPoolSize << ")" << std::endl;
@@ -80,6 +81,9 @@ void WebServer::InitDatabase() {
     } else {
         std::cout << "Database not configured, skipping initialization" << std::endl;
     }
+#else
+    std::cout << "PostgreSQL support is not enabled, skipping database initialization" << std::endl;
+#endif  // HAVE_POSTGRESQL
 }
 
 void WebServer::InitServer() {
@@ -133,10 +137,6 @@ void WebServer::Stop() {
     // 停止线程池
     _threadPool.reset();
 
-    // 关闭数据库连接池
-    if (_dbPool) {
-        _dbPool->Close();
-    }
 
     std::cout << "Server stopped." << std::endl;
 }

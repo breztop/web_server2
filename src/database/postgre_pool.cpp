@@ -1,16 +1,19 @@
 #include "postgre_pool.hpp"
 
 #include <stdexcept>
+
+#ifdef HAVE_POSTGRESQL
 #include <pqxx/pqxx>
+#endif  // HAVE_POSTGRESQL
 
 PostgrePool::PostgrePool() = default;
 
 PostgrePool::~PostgrePool() { Close(); }
 
-PostgrePool::ConnectionGuard::ConnectionGuard(
-	PostgrePool* pool,
-	std::shared_ptr<pqxx::connection> connection)
-	: _pool(pool), _connection(std::move(connection)) {}
+PostgrePool::ConnectionGuard::ConnectionGuard(PostgrePool* pool,
+                                              std::shared_ptr<pqxx::connection> connection)
+    : _pool(pool)
+    , _connection(std::move(connection)) {}
 
 PostgrePool::ConnectionGuard::ConnectionGuard(ConnectionGuard&& other) noexcept
 	: _pool(other._pool), _connection(std::move(other._connection)) {

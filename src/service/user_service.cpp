@@ -2,10 +2,16 @@
 
 #include <algorithm>
 #include <functional>
+#include <iomanip>
 #include <iostream>
 #include <sstream>
-#include <iomanip>
+
+// for password hashing
 #include <openssl/evp.h>
+
+#include <pqxx/pqxx>
+
+#include "database/postgre_pool.hpp"
 
 namespace bre {
 

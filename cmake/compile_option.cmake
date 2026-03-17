@@ -9,9 +9,6 @@ endif()
 # 检测平台
 if(WIN32)
     add_definitions(-D_WIN32_WINNT=0x0601)  # Windows 7及以上
-    set(PLATFORM_WINDOWS ON)
-elseif(UNIX)
-    set(PLATFORM_LINUX ON)
 endif()
 
 # Release下 -O2 优化级别, 尽可能的提升运行速度
@@ -22,3 +19,5 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
         add_compile_options(-O3)
     endif()
 endif()
+
+set(FETCHCONTENT_BASE_DIR ${CMAKE_SOURCE_DIR}/run/third_party)

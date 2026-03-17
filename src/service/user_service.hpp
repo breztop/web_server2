@@ -5,9 +5,6 @@
 #include <optional>
 #include <vector>
 
-#include <pqxx/pqxx>
-
-#include "../database/postgre_pool.hpp"
 
 namespace bre {
 
