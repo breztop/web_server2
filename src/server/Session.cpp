@@ -382,8 +382,7 @@ void Session::StartTimer() {
 void Session::ResetTimer() { _timer.expires_after(_timeoutDuration); }
 
 void Session::CancelTimer() {
-    boost::system::error_code ec;
-    _timer.cancel(ec);
+    _timer.cancel();
 }
 
 }  // namespace bre
