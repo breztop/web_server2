@@ -17,7 +17,7 @@ void print_build_info() {
 #ifdef HAVE_POSTGRESQL
     std::cout << "\nPostgreSQL support: ENABLED\n";
 #else
-#warning "PostgreSQL support disabled"
+#message "PostgreSQL support disabled"
     std::cout << "\nPostgreSQL support: DISABLED\n";
 #endif
 }
